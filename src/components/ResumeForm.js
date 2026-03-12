@@ -1,10 +1,36 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Upload } from 'lucide-react';
+import { Plus, Trash2, Upload, Sparkles, Loader2 } from 'lucide-react';
+import { enhanceText } from '../utils/gemini';
 
 const ResumeForm = ({ resumeData, updateResumeData, jobDescription, setJobDescription }) => {
   const [activeSection, setActiveSection] = useState('personalInfo');
   const [newSkill, setNewSkill] = useState('');
+  const [isEnhancing, setIsEnhancing] = useState(null); // 'summary', 'experience-0', 'project-0' etc.
+
+  const handleEnhance = async (text, section, index = null) => {
+    if (!text || text.trim().length < 5) {
+      alert("Please enter some text first to let AI enhance it.");
+      return;
+    }
+
+    const loadingId = index !== null ? `${section}-${index}` : section;
+    setIsEnhancing(loadingId);
+
+    try {
+      const enhanced = await enhanceText(text, section, jobDescription);
+      if (index !== null) {
+        const item = resumeData[section][index];
+        updateArrayItem(section, index, { ...item, description: enhanced });
+      } else {
+        updateResumeData(section, enhanced);
+      }
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setIsEnhancing(null);
+    }
+  };
 
   const sections = [
     { id: 'personalInfo', label: 'Contact Info' },
@@ -81,6 +107,21 @@ const ResumeForm = ({ resumeData, updateResumeData, jobDescription, setJobDescri
 
   const renderSummary = () => (
     <div className="space-y-4">
+      <div className="flex justify-between items-center mb-2">
+        <label className="block text-sm font-medium text-gray-700">Summary</label>
+        <button
+          onClick={() => handleEnhance(resumeData.summary, 'summary')}
+          disabled={isEnhancing === 'summary'}
+          className="flex items-center gap-2 text-sm px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50"
+        >
+          {isEnhancing === 'summary' ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Sparkles size={16} />
+          )}
+          Enhance with AI
+        </button>
+      </div>
       <textarea
         placeholder="Write a compelling professional summary (2-3 sentences highlighting your key strengths and career objectives)"
         value={resumeData.summary}
@@ -194,13 +235,30 @@ const ResumeForm = ({ resumeData, updateResumeData, jobDescription, setJobDescri
               className="p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <textarea
-            placeholder="Job description with achievements and metrics"
-            value={exp.description || ''}
-            onChange={(e) => updateArrayItem('experience', index, { ...exp, description: e.target.value })}
-            rows={3}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-          />
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium text-gray-700">Description</label>
+              <button
+                onClick={() => handleEnhance(exp.description, 'experience', index)}
+                disabled={isEnhancing === `experience-${index}`}
+                className="flex items-center gap-2 text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors disabled:opacity-50"
+              >
+                {isEnhancing === `experience-${index}` ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                Enhance with AI
+              </button>
+            </div>
+            <textarea
+              placeholder="Job description with achievements and metrics"
+              value={exp.description || ''}
+              onChange={(e) => updateArrayItem('experience', index, { ...exp, description: e.target.value })}
+              rows={3}
+              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
         </motion.div>
       ))}
       <button
@@ -298,13 +356,30 @@ const ResumeForm = ({ resumeData, updateResumeData, jobDescription, setJobDescri
             onChange={(e) => updateArrayItem('projects', index, { ...proj, name: e.target.value })}
             className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          <textarea
-            placeholder="Project description and achievements"
-            value={proj.description || ''}
-            onChange={(e) => updateArrayItem('projects', index, { ...proj, description: e.target.value })}
-            rows={3}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-          />
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium text-gray-700">Description</label>
+              <button
+                onClick={() => handleEnhance(proj.description, 'projects', index)}
+                disabled={isEnhancing === `projects-${index}`}
+                className="flex items-center gap-2 text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors disabled:opacity-50"
+              >
+                {isEnhancing === `projects-${index}` ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                Enhance with AI
+              </button>
+            </div>
+            <textarea
+              placeholder="Project description and achievements"
+              value={proj.description || ''}
+              onChange={(e) => updateArrayItem('projects', index, { ...proj, description: e.target.value })}
+              rows={3}
+              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
           <input
             type="text"
             placeholder="Technologies used"
@@ -416,22 +491,20 @@ const ResumeForm = ({ resumeData, updateResumeData, jobDescription, setJobDescri
           <button
             key={section.id}
             onClick={() => setActiveSection(section.id)}
-            className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-              activeSection === section.id
+            className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${activeSection === section.id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+              }`}
           >
             {section.label}
           </button>
         ))}
         <button
           onClick={() => setActiveSection('jobDescription')}
-          className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-            activeSection === 'jobDescription'
+          className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${activeSection === 'jobDescription'
               ? 'bg-blue-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
+            }`}
         >
           Job Description
         </button>
